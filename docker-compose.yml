@@ -23,14 +23,15 @@ services:
     hostname: kafka-broker
     container_name: kafka-broker
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_started
     networks:
       - kafka-net
     ports:
       - "9092:9092"
     expose:
      - "9093"
-    command: sh -c "((sleep 15 && kafka-topics --bootstrap-server kafka-broker:9093 --create --replication-factor 1 --partitions 1 --topic eventos)&) && /etc/confluent/docker/run ">
+    command: sh -c "((sleep 15 && kafka-topics --bootstrap-server kafka-broker:9093 --create --replication-factor $REPLICATION_FACTOR --partitions $PARTITIONS --topic $TOPIC)&) && /etc/confluent/docker/run ">
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ADVERTISED_HOST_NAME: kafka-broker
@@ -51,7 +52,8 @@ services:
     hostname: kafka-ui
     container_name: kafka-ui
     depends_on:
-      - kafka-broker
+      kafka-broker:
+        condition: service_started
     networks:
       - kafka-net
     ports:
@@ -61,6 +63,44 @@ services:
       KAFKA_CLUSTERS_0_NAME: "local-cluster"
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka-broker:9093"
       KAFKA_CLUSTERS_0_ZOOKEEPER: "zookeeper:2181"
+
+  mongodb:
+    image: mongo:latest
+    hostname: mongodb
+    container_name: mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: $DB_USER
+      MONGO_INITDB_ROOT_PASSWORD: $DB_PASSWORD_USER
+    volumes:
+      - mongodb_data:/data/db
+      - ./mongo/mongodb_config:/data/configdb
+      - ./mongo/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js
+    networks:
+      - kafka-net
+
+  mongo-express:
+    image: mongo-express:latest
+    hostname: mongoexpress
+    container_name: mongoexpress
+    restart: no
+    ports:
+      - 8081:8081
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: $DB_USER
+      ME_CONFIG_MONGODB_ADMINPASSWORD: $DB_PASSWORD_USER
+      ME_CONFIG_MONGODB_URL: mongodb://$DB_USER:$DB_PASSWORD_USER@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: $EXPRESS_USER
+      ME_CONFIG_BASICAUTH_PASSWORD: $EXPRESS_PASSWORD
+    links:
+      - mongodb
+    depends_on:
+      mongodb:
+        condition: service_started
+    networks:
+      - kafka-net
 
   producer:
     hostname: producer
@@ -83,12 +123,15 @@ services:
     volumes:
       - ./consumer:/app
     depends_on:
-      producer:
-        condition: service_started
       kafka-broker:
+        condition: service_started
+      mongodb:
         condition: service_started
     networks:
       - kafka-net
+
+volumes:
+  mongodb_data:
 
 networks:
   kafka-net:
