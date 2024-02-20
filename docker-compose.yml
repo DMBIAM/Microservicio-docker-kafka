@@ -14,6 +14,9 @@ services:
     restart: unless-stopped
     networks:
       - kafka-net
+    volumes:
+      - ./data/zookeeper/data:/data
+      - ./data/zookeeper/datalog:/datalog
   
   kafka-broker:
     image: confluentinc/cp-kafka:latest
@@ -27,6 +30,7 @@ services:
       - "9092:9092"
     expose:
      - "9093"
+    command: sh -c "((sleep 15 && kafka-topics --bootstrap-server kafka-broker:9093 --create --replication-factor 1 --partitions 1 --topic eventos)&) && /etc/confluent/docker/run ">
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ADVERTISED_HOST_NAME: kafka-broker
@@ -38,38 +42,25 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_LOG_RETENTION_HOURS: 1
-      KAFKA_CREATE_TOPICS: "eventos:1:1"
     volumes:
      - /var/run/docker.sock:/var/run/docker.sock
     restart: unless-stopped
-  
+
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     hostname: kafka-ui
     container_name: kafka-ui
     depends_on:
-      - zookeeper
       - kafka-broker
     networks:
       - kafka-net
     ports:
       - "8090:8080"
     environment:
-      KAFKA_CLUSTER_0_NAME: local
-      KAFKA_CLUSTER_0_BOOTSTRAP: kafka-broker:9092
-      KAFKA_CLUSTER_0_ZOOKEEPER: zookeeper:2181
-
-  kafdrop:
-    image: obsidiandynamics/kafdrop:latest
-    hostname: kafdrop
-    container_name: kafdrop
-    restart: "no"
-    ports:
-      - "9000:9000"
-    environment:
-      KAFKA_BROKERCONNECT: kafka-broker:9093
-    depends_on:
-      - kafka-broker
+      DYNAMIC_CONFIG_ENABLED: 'true'
+      KAFKA_CLUSTERS_0_NAME: "local-cluster"
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: "kafka-broker:9093"
+      KAFKA_CLUSTERS_0_ZOOKEEPER: "zookeeper:2181"
 
   producer:
     hostname: producer
@@ -79,7 +70,8 @@ services:
     volumes:
       - ./producer:/app
     depends_on:
-      - kafka-broker
+      kafka-broker:
+        condition: service_started
     networks:
       - kafka-net
 

@@ -6,5 +6,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY consumer.py .
+COPY init.sh .
 
-CMD ["python", "consumer.py"]
+RUN chmod +x init.sh
+
+CMD ["./init.sh"]
