@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Esperar 20 segundos
-sleep 20
+sleep 30
 
 # Ejecutar el script del consumer
 python consumer.py

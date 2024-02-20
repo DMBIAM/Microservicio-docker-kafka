@@ -75,5 +75,20 @@ services:
     networks:
       - kafka-net
 
+  consumer:
+    hostname: consumer
+    container_name: consumer
+    build:
+      context: ./consumer
+    volumes:
+      - ./consumer:/app
+    depends_on:
+      producer:
+        condition: service_started
+      kafka-broker:
+        condition: service_started
+    networks:
+      - kafka-net
+
 networks:
   kafka-net:
